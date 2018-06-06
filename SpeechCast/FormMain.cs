@@ -982,7 +982,7 @@ namespace SpeechCast
             return null;
         }
 
-        private void StartSpeakingAsync(int resNumber)
+        private void StartSpeaking(int resNumber)
         {
             StopSpeaking();
 
@@ -1026,11 +1026,30 @@ namespace SpeechCast
                 // ミミックかってに改造 テスト実装でそのままだった変数への代入がきちんと行われるように追加
                 if (UserConfig.CommandLineTargetPath != "")
                 {
-                    String LogText = UserConfig.CommandLineParam.Replace("#Res#", res.Text);
-                    LogText = LogText.Replace("#Name#", res.Name);
-                    LogText = LogText.Replace("#No#", res.Number.ToString());
-                    LogText = LogText.Replace("#Time#", res.DateTime);
-                    System.Diagnostics.Process.Start(UserConfig.CommandLineTargetPath, LogText);
+                    if (pronounciationText2.Length >= UserConfig.AAModeTextLength)
+                    {
+                        String LogText2 = UserConfig.CommandLineParam.Replace("#Res#", UserConfig.SpeakingTextWhenAAMode);
+                        LogText2 = LogText2.Replace("#Name#", res.Name);
+                        LogText2 = LogText2.Replace("#No#", res.Number.ToString());
+                        LogText2 = LogText2.Replace("#Time#", res.DateTime);
+                        System.Diagnostics.Process.Start(UserConfig.CommandLineTargetPath, LogText2);
+                    }
+                    else if (UserConfig.IncludeAAConditionText(text))
+                    {
+                        String LogText2 = UserConfig.CommandLineParam.Replace("#Res#", UserConfig.SpeakingTextWhenAAMode);
+                        LogText2 = LogText2.Replace("#Name#", res.Name);
+                        LogText2 = LogText2.Replace("#No#", res.Number.ToString());
+                        LogText2 = LogText2.Replace("#Time#", res.DateTime);
+                        System.Diagnostics.Process.Start(UserConfig.CommandLineTargetPath, LogText2);
+                    }
+                    else
+                    {
+                        String LogText = UserConfig.CommandLineParam.Replace("#Res#", res.Text);
+                        LogText = LogText.Replace("#Name#", res.Name);
+                        LogText = LogText.Replace("#No#", res.Number.ToString());
+                        LogText = LogText.Replace("#Time#", res.DateTime);
+                        System.Diagnostics.Process.Start(UserConfig.CommandLineTargetPath, LogText);
+                    }
                 }
                 // ミミックかってに改造 ここまで
 
@@ -1278,6 +1297,7 @@ namespace SpeechCast
 
         private List<int> replacementIndices;
         private string pronounciationText;
+        private string pronounciationText2;
 
         private void toolStripButtonCaption_Click(object sender, EventArgs e)
         {
@@ -1882,7 +1902,7 @@ namespace SpeechCast
 
         private void toolStripMenuItemFirst_Click(object sender, EventArgs e)
         {
-            StartSpeakingAsync(1);
+            StartSpeaking(1);
         }
 
         private void toolStripMenuItemPrev_Click(object sender, EventArgs e)
@@ -1896,7 +1916,7 @@ namespace SpeechCast
                     CurrentResNumber--;
                 }
 
-                StartSpeakingAsync(CurrentResNumber);
+                StartSpeaking(CurrentResNumber);
             }
         }
 
@@ -1908,13 +1928,13 @@ namespace SpeechCast
                 {
                     CurrentResNumber++;
                 }
-                StartSpeakingAsync(CurrentResNumber);
+                StartSpeaking(CurrentResNumber);
             }
         }
 
         private void toolStripMenuItemLast_Click(object sender, EventArgs e)
         {
-            StartSpeakingAsync(responses.Count);
+            StartSpeaking(responses.Count);
         }
 
         private void toolStripMenuItemStop_Click(object sender, EventArgs e)
