@@ -22,7 +22,6 @@ namespace SpeechCast
         public int ScrollY = -1;
         public static BBSStyle Style;
         public const string AnchorUrl = "http://res/";
-
         public static int MaxResponseCount
         {
             get
@@ -33,9 +32,10 @@ namespace SpeechCast
                         return 1000;
                     case BBSStyle.yykakiko:
                     case BBSStyle.nichan:
+                    case BBSStyle.nichanlike:
+                    default: //< フォールスルー
                         return 1001;
                 }
-                return 1000;
             }
         }
 
@@ -57,6 +57,10 @@ namespace SpeechCast
             /// 2ch形式
             /// </summary>
             nichan,
+            /// <summary>
+            /// 2ch類似スクリプト
+            /// </summary>
+            nichanlike,
         }
 
         public Response()
@@ -102,6 +106,7 @@ namespace SpeechCast
                     break;
                 case BBSStyle.yykakiko:
                 case BBSStyle.nichan:
+                case BBSStyle.nichanlike:
                     {
                         string[] values = rawText.Split(delimStrings, StringSplitOptions.None);
 

@@ -10,7 +10,7 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("すれいまん")]
 [assembly: AssemblyProduct("SpeechCast")]
-[assembly: AssemblyCopyright("Copyright © すれいまん 2014 Copyright © よっしー 2008,2009,2013")]
+[assembly: AssemblyCopyright("Copyright © すれいまん 2014 Copyright © よっしー 2008,2009,2013 Copyright © ミミック 2018")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
@@ -32,5 +32,5 @@ using System.Runtime.InteropServices;
 // すべての値を指定するか、下のように '*' を使ってビルドおよびリビジョン番号を 
 // 既定値にすることができます:
 // [assembly: AssemblyVersion("1.0.*")]
-[assembly: AssemblyVersion("2.0.1.23")]
-[assembly: AssemblyFileVersion("2.0.1.23")]
+[assembly: AssemblyVersion("2.0.1.117")]
+[assembly: AssemblyFileVersion("2.0.1.117")]

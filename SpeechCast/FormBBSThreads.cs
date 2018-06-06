@@ -51,6 +51,8 @@ namespace SpeechCast
                     break;
                 case Response.BBSStyle.yykakiko:
                 case Response.BBSStyle.nichan:
+                case Response.BBSStyle.nichanlike:
+                default:  //< フォールバック
                     encodingName = "Shift_JIS";
                     break;
             }
@@ -154,6 +156,7 @@ namespace SpeechCast
                         return true;
                     }
                     m = Communicator.NichanBaseRegex.Match(BaseURL);
+                    if (!m.Success) { m = Communicator.NichanLikeBaseRegex.Match(BaseURL); }
                     if (m.Success)
                     {
                         ThreadURL = string.Format("{0}/test/read.cgi/{1}/{2}/"

@@ -17,6 +17,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Runtime.InteropServices;
 
+
 namespace SpeechCast
 {
     public partial class FormMain : Form
@@ -67,7 +68,7 @@ namespace SpeechCast
             this.webBrowser.StatusTextChanged += new EventHandler(webBrowser_StatusTextChanged);
             this.webBrowser.Navigating += new WebBrowserNavigatingEventHandler(webBrowser_Navigating);
             // JavaScriptでの差分取得用HTMLをセット
-            string html = Properties.Resources.resView.ToString();
+            string html = SpeechCast.Properties.Resources.resView.ToString();
             webBrowser.DocumentText = html;
         }
 
@@ -88,13 +89,15 @@ namespace SpeechCast
                     webBrowser.Document.Window.ScrollTo(0, GetResponsesScrollY(resNo));
                 }
             }
-            else if (diffurl.EndsWith("jpg") || diffurl.EndsWith("png") || diffurl.EndsWith("gif") || diffurl.EndsWith("jpeg") || diffurl.EndsWith("bmp"))
+            // ミミックかってに改造 内蔵ビューアを使用しないように条件偽装（ごめんなさい）
+            else if (diffurl.EndsWith("tsukawanai") )
             {
                 e.Cancel = true;
                 oepnFormViewNewtabImg(url);
             }
-            else if (url.IndexOf("youtube.com/watch?v=")>0)
+            else if (url.IndexOf("tsukawanai.com/watch?v=")>0)
             {
+            // ミミックかってに改造 ここまで
                 e.Cancel = true;
                 Match m = youtubeId.Match(url);
                 if(m.Success){
@@ -295,40 +298,46 @@ namespace SpeechCast
         }
 
 
-        Regex jbbsBaseRegex = new System.Text.RegularExpressions.Regex(@"(http://(jbbs.livedoor.jp|jbbs.shitaraba.net)/\w+/\d+/)");
-        Regex nichanBaseRegex = new System.Text.RegularExpressions.Regex(@"(http://.+2ch\.net/\w+/)\s*$");
-        Regex yyBaseRegex = new System.Text.RegularExpressions.Regex(@"(http://(yy.+\.60\.kg|yy.+\.kakiko\.com|bbs\.aristocratism\.info|www.+\.atchs\.jp)/\w+/$)");
+        readonly Regex jbbsBaseRegex = Communicator.JBBSBaseRegex;
+        readonly Regex nichanBaseRegex = Communicator.NichanBaseRegex;
+        readonly Regex yyBaseRegex = Communicator.YYBaseRegex;
+        readonly Regex nichanlikeBaseRegex = Communicator.NichanLikeBaseRegex;
 
         private bool CheckBaseURL()
         {
             Match m = jbbsBaseRegex.Match(toolStripTextBoxURL.Text);
-
             if (m.Success)
             {
-                baseURL = m.Groups[1].Value;
+                baseURL = m.Groups[0].Value;
                 Response.Style = Response.BBSStyle.jbbs;
                 return true;
             }
-            else
+            
+            m = nichanBaseRegex.Match(toolStripTextBoxURL.Text);
+            if (m.Success)
             {
-                m = nichanBaseRegex.Match(toolStripTextBoxURL.Text);
-                if (m.Success)
-                {
-                    baseURL = m.Groups[1].Value;
+                    baseURL = m.Groups[0].Value;
                     Response.Style = Response.BBSStyle.nichan;
                     return true;
-                }
-                else
-                {
-                    m = yyBaseRegex.Match(toolStripTextBoxURL.Text);
-                    if (m.Success)
-                    {
-                        baseURL = m.Groups[1].Value;
-                        Response.Style = Response.BBSStyle.yykakiko;
-                        return true;
-                    }
-                }
+            
+             }
+
+            m = yyBaseRegex.Match(toolStripTextBoxURL.Text);
+            if (m.Success)
+            {
+                baseURL = m.Groups[0].Value;
+                Response.Style = Response.BBSStyle.yykakiko;
+                return true;
             }
+
+            m = nichanlikeBaseRegex.Match(toolStripTextBoxURL.Text);
+            if (m.Success)
+            {
+                baseURL = m.Groups[0].Value;
+                Response.Style = Response.BBSStyle.nichanlike;
+                return true;
+            }
+
             return false;
         }
 
@@ -362,6 +371,7 @@ namespace SpeechCast
                         break;
                     case Response.BBSStyle.yykakiko:
                     case Response.BBSStyle.nichan:
+                    case Response.BBSStyle.nichanlike:
                         url = rawURL;
                         clearItems = false;
                         useRangeHeader = true;
@@ -374,9 +384,10 @@ namespace SpeechCast
 #if DEBUG
                 debugDatFileName = null;
 #endif
-                Match m = Communicator.JBBSRegex.Match(toolStripTextBoxURL.Text);
-                if (m.Success)
-                {
+
+                Match JBBSRegex = Communicator.JBBSRegex.Match(toolStripTextBoxURL.Text);
+                Action JBBSSetURL = (() => {
+                    var m = JBBSRegex;
                     rawURL = m.Groups[1].Value + "/bbs/rawmode.cgi" + m.Groups[2];
                     threadId = m.Groups[5].Value;
                     AddLog("jbbs rawmode: {0} {1}", rawURL, threadId);
@@ -384,67 +395,104 @@ namespace SpeechCast
                     encodingName = "EUC-JP";
 
                     baseURL = string.Format("{0}/{1}/{2}/", m.Groups[1], m.Groups[3], m.Groups[4]);
-                }
-                else
+                });
+                
+                Match YYRegex = Communicator.YYRegex.Match(toolStripTextBoxURL.Text);
+                Action YYSetURL = (() =>
                 {
-                    m = Communicator.YYRegex.Match(toolStripTextBoxURL.Text);
-                    if (m.Success)
-                    {
-                        rawURL = m.Groups[1].Value + "/" + m.Groups[2].Value + "/dat/" + m.Groups[3].Value + ".dat";
-                        threadId = m.Groups[3].Value;
-                        Response.Style = Response.BBSStyle.yykakiko;
+                    var m = YYRegex;
+                    rawURL = m.Groups[1].Value + "/" + m.Groups[2].Value + "/dat/" + m.Groups[3].Value + ".dat";
+                    threadId = m.Groups[3].Value;
+                    Response.Style = Response.BBSStyle.yykakiko;
 
-                        AddLog("yykakiko dat mode: {0} {1}", rawURL , threadId);
+                    AddLog("yykakiko dat mode: {0} {1}", rawURL, threadId);
 
-                        encodingName = "Shift_JIS";
-                        baseURL = string.Format("{0}/{1}/", m.Groups[1], m.Groups[2]);
-                    }
-                    else
-                    {
-                        m = Communicator.NichanRegex.Match(toolStripTextBoxURL.Text);
-                        if (m.Success)
-                        {
-                            rawURL = m.Groups[1].Value + "/" + m.Groups[2].Value + "/dat/" + m.Groups[3].Value + ".dat";
-                            threadId = m.Groups[3].Value;
-                            Response.Style = Response.BBSStyle.nichan;
+                    encodingName = "Shift_JIS";
+                    baseURL = string.Format("{0}/{1}/", m.Groups[1], m.Groups[2]);
+                });
 
-                            AddLog("2ch dat mode: {0} {1}", rawURL , threadId);
+                Match NichanRegex = Communicator.NichanRegex.Match(toolStripTextBoxURL.Text);
+                Action NichanSetURL = (() =>
+                {
+                    var m = NichanRegex;
+                    rawURL = m.Groups[1].Value + "/" + m.Groups[2].Value + "/dat/" + m.Groups[3].Value + ".dat";
+                    threadId = m.Groups[3].Value;
+                    Response.Style = Response.BBSStyle.nichan;
 
-                            encodingName = "Shift_JIS";
-                            baseURL = string.Format("{0}/{1}/", m.Groups[1], m.Groups[2]);
+                    AddLog("2ch dat mode: {0} {1}", rawURL, threadId);
+
+                    encodingName = "Shift_JIS";
+                    baseURL = string.Format("{0}/{1}/", m.Groups[1], m.Groups[2]);
 #if DEBUG
-                            debugDatFileName = m.Groups[3].Value + ".dat";
+                    debugDatFileName = m.Groups[3].Value + ".dat";
 #endif
-                        }
+                });
+                
+                Match NichanLikeRegex = Communicator.NichanLikeRegex.Match(toolStripTextBoxURL.Text);
+                Action NichanLikeSetURL = (() =>
+                {
+                    var m = NichanLikeRegex;
+                    rawURL = m.Groups[1].Value + "/" + m.Groups[2].Value + "/dat/" + m.Groups[3].Value + ".dat";
+                    threadId = m.Groups[3].Value;
+                    Response.Style = Response.BBSStyle.nichanlike;
+
+                    AddLog("2chLike dat mode: {0} {1}", rawURL, threadId);
+
+                    encodingName = "Shift_JIS";
+                    baseURL = string.Format("{0}/{1}/", m.Groups[1], m.Groups[2]);
+#if DEBUG
+                    debugDatFileName = m.Groups[3].Value + ".dat";
+#endif
+
+                });
+
+                var RegexActionDict = new Dictionary<Action, Match>()
+                {
+                    {JBBSSetURL, JBBSRegex},
+                    {YYSetURL, YYRegex},
+                    {NichanSetURL, NichanRegex},
+                    {NichanLikeSetURL, NichanLikeRegex},
+
+                };
+                foreach (KeyValuePair<Action, Match> kvp in RegexActionDict)
+                {
+                    if (kvp.Value.Success)
+                    {
+                        kvp.Key();
+                        break;
                     }
                 }
-
-
-                if (rawURL == null)
-                {
-                    AutoUpdate = false;
-                    MessageBox.Show("サポートしていないＵＲＬです");
-                    return false;
-                }
-                url = rawURL;
-                datSize = 1;
-                // レス差分取得関係の初期化処理
-                if (oldUrl != rawURL)
-                {
-                    responses.Clear();
-                    oldUrl = rawURL;
-                    oldResCount = 0;
-                    Object[] objArray = new Object[1];
-                    webBrowser.Document.InvokeScript("clearRes", objArray);
-                }
+                
             }
+                    
+
+
+            if (rawURL == null)
+            {
+                AutoUpdate = false;
+                MessageBox.Show("サポートしていないＵＲＬです");
+                return false;
+            }
+            url = rawURL;
+            datSize = 1;
+            // レス差分取得関係の初期化処理
+            if (oldUrl != rawURL)
+            {
+                responses.Clear();
+                oldUrl = rawURL;
+                oldResCount = 0;
+                Object[] objArray = new Object[1];
+                webBrowser.Document.InvokeScript("clearRes", objArray);
+            }
+            
 
             System.Diagnostics.Stopwatch stopWatch = new System.Diagnostics.Stopwatch();
             // 完全にバックグラウンド処理になったので、メッセージなどはコメントアウト
             //communicationStatusString = "通信中・・・・";
             //PushAndSetWaitCursor();
+            //　ミミック修正　使われてない変数を削除
             int oldResponseCount = responses.Count;
-            long responseTime = 0, readTime = 0, listViewTime = 0, documetnTime = 0, encodingTime = 0, setTime = 0;
+            long responseTime = 0, readTime = 0, listViewTime = 0, encodingTime = 0, setTime = 0;
             System.Net.HttpWebResponse webRes = null;
             // タイムアウト等の結果判別用真偽値
             bool webReqResult = true;
@@ -480,7 +528,7 @@ namespace SpeechCast
                         lastModifiedDateTime = webRes.LastModified;
                         responseTime = stopWatch.ElapsedMilliseconds;
                     }
-                    catch (System.Net.WebException e)
+                    catch (System.Net.WebException)
                     {
                         webReqResult = false;
                     }
@@ -546,7 +594,7 @@ namespace SpeechCast
                             memStream.Seek(0, SeekOrigin.Begin);
 
 #if DEBUG
-                            if (Response.Style == Response.BBSStyle.nichan && string.IsNullOrEmpty(debugDatFileName) == false && memStream.Length > 1)
+                            if ((Response.Style == Response.BBSStyle.nichan  || Response.Style == Response.BBSStyle.nichanlike) && string.IsNullOrEmpty(debugDatFileName) == false && memStream.Length > 1)
                             {
                                 memStream.ReadByte();
 
@@ -905,7 +953,7 @@ namespace SpeechCast
                             CurrentResNumber = responses.Count + 1;
                         }
                         captionTextBuffer = textBoxDefaultCaption.Text;
-                        StartSpeaking();
+                        StartSpeakingAsync();
                     }
                     else
                     {
@@ -934,19 +982,19 @@ namespace SpeechCast
             return null;
         }
 
-        private void StartSpeaking(int resNumber)
+        private void StartSpeakingAsync(int resNumber)
         {
             StopSpeaking();
 
             CurrentResNumber = resNumber;
-            StartSpeaking();
+            StartSpeakingAsync();
         }
         int fileNameIndex = 0;
 
         private bool isSpeaking = false;
         private string speakingText = "";
         private bool isSpeakingWarningMessage = false;
-        private void StartSpeaking()
+        private async Task StartSpeakingAsync()
         {
             speakClipboard = false;
 
@@ -975,10 +1023,16 @@ namespace SpeechCast
                 StartSpeaking(text);
                 //コマンドライン引渡し
                 //ターゲット指定が空でなければ実行
+                // ミミックかってに改造 テスト実装でそのままだった変数への代入がきちんと行われるように追加
                 if (UserConfig.CommandLineTargetPath != "")
                 {
-                    System.Diagnostics.Process.Start(UserConfig.CommandLineTargetPath, @UserConfig.CommandLineParam);
+                    String LogText = UserConfig.CommandLineParam.Replace("#Res#", res.Text);
+                    LogText = LogText.Replace("#Name#", res.Name);
+                    LogText = LogText.Replace("#No#", res.Number.ToString());
+                    LogText = LogText.Replace("#Time#", res.DateTime);
+                    System.Diagnostics.Process.Start(UserConfig.CommandLineTargetPath, LogText);
                 }
+                // ミミックかってに改造 ここまで
 
                 //レスの出力処理とクリップボードコピー
                 if (UserConfig.OutputLog || UserConfig.CopyLog)
@@ -1053,9 +1107,13 @@ namespace SpeechCast
                                 LogText = LogText.Replace("#No#", res.Number.ToString());
                                 LogText = LogText.Replace("#Time#", res.DateTime);
                                 writer.WriteLine(LogText);
+                                
+
                             }
                             System.Threading.Thread.Sleep(UserConfig.LogOutputInterval);
+                            
                             fileNameIndex++;
+
                         }
                     }
                 } 
@@ -1245,7 +1303,7 @@ namespace SpeechCast
 
                 if (synthesizer.State == SynthesizerState.Ready)
                 {
-                    StartSpeaking();
+                    StartSpeakingAsync();
                 }
             }
         }
@@ -1270,7 +1328,8 @@ namespace SpeechCast
         private const int OpenNextThread = 1;
         // 次スレへ移動中(移動中アナウンス管理用)
         private const int SpeakAnnounce = 2;
-        private bool endThreadAlertFlg = false;
+        // ミミック勝手に改造　使われてない変数を無効に
+        //private bool endThreadAlertFlg = false;
         private TimeSpan diff;
         private TimeSpan diffWeb;
         // 読み上げ管理用バックグラウンドプロセス
@@ -1299,6 +1358,13 @@ namespace SpeechCast
                 { 
                     objDate = System.DateTime.Now;
                     FormCaption.Instance.CaptionText = CaptionTextBuffer;
+                    // ミミックかってに改造　テキスト出力した物を消す
+                    if (System.IO.File.Exists(UserConfig.OutputLogPath))
+                    {
+                        System.IO.File.Delete(UserConfig.OutputLogPath);
+                    }
+                       
+                    // ミミックかってに改造　ここまで
                 }
                 // 自動更新がONならば
                 if (AutoUpdate)
@@ -1386,7 +1452,7 @@ namespace SpeechCast
                     //&& responses.Count >= CurrentResNumber
                     )
                 {
-                    StartSpeaking();
+                    StartSpeakingAsync();
                     if (CurrentResNumber == UserConfig.endThreadWarningResCount && !endThreadWarning)
                     {
                         endThreadWarning = true;
@@ -1816,7 +1882,7 @@ namespace SpeechCast
 
         private void toolStripMenuItemFirst_Click(object sender, EventArgs e)
         {
-            StartSpeaking(1);
+            StartSpeakingAsync(1);
         }
 
         private void toolStripMenuItemPrev_Click(object sender, EventArgs e)
@@ -1830,7 +1896,7 @@ namespace SpeechCast
                     CurrentResNumber--;
                 }
 
-                StartSpeaking(CurrentResNumber);
+                StartSpeakingAsync(CurrentResNumber);
             }
         }
 
@@ -1842,13 +1908,13 @@ namespace SpeechCast
                 {
                     CurrentResNumber++;
                 }
-                StartSpeaking(CurrentResNumber);
+                StartSpeakingAsync(CurrentResNumber);
             }
         }
 
         private void toolStripMenuItemLast_Click(object sender, EventArgs e)
         {
-            StartSpeaking(responses.Count);
+            StartSpeakingAsync(responses.Count);
         }
 
         private void toolStripMenuItemStop_Click(object sender, EventArgs e)
@@ -1901,6 +1967,11 @@ namespace SpeechCast
             string url = Clipboard.GetText();
 
             if (url.StartsWith("http://"))
+            {
+                toolStripTextBoxURL.Text = url;
+                GetFromURL();
+            }
+            if (url.StartsWith("https://"))
             {
                 toolStripTextBoxURL.Text = url;
                 GetFromURL();
@@ -1997,21 +2068,18 @@ namespace SpeechCast
                 ToolTip1.Hide(this);
             }
         }
-
+        // ミミックかってに改造 サポート連絡先の変更)
         private void toolStripMenuItemGoSupportBBS_Click(object sender, EventArgs e)
         {
-            if (MessageBox.Show("サポート掲示板に移動します。よろしいですか？", "警告", MessageBoxButtons.YesNo) == DialogResult.Yes)
-            {
-                toolStripTextBoxURL.Text = "http://bbs.aristocratism.info/slyman/";
-                GetFromURL();
-            }
+            
+            System.Diagnostics.Process.Start("http://jbbs.shitaraba.net/computer/43059/");
         }
 
         private void toolStripMenuItemGoLatestRelease_Click(object sender, EventArgs e)
         {
-            System.Diagnostics.Process.Start("https://github.com/ggslyman/SpeechCast/releases/latest");
+            System.Diagnostics.Process.Start("https://twitter.com/s_mimic360");
         }
-
+        // ミミックかってに改造 ここまで
         private void toolStripButtonTurbo_Click(object sender, EventArgs e)
         {
             UserConfig.TurboMode = !UserConfig.TurboMode;
@@ -2122,6 +2190,8 @@ namespace SpeechCast
                             break;
                         case Response.BBSStyle.yykakiko:
                         case Response.BBSStyle.nichan:
+                        case Response.BBSStyle.nichanlike:
+                        default:
                             encodingName = "Shift_JIS";
                             break;
                     }
@@ -2183,7 +2253,7 @@ namespace SpeechCast
                             threadId = m3.Value;
                         }
                         // スレッドURLを生成
-                        string threadUrl = Communicator.Instance.getThreadUrl(baseURL, threadId);
+                        string threadUrl = Communicator.Instance.GetThreadUrl(baseURL, threadId);
                         if (threadUrl.Length > 0)
                         {
                             // スレッドURLを生成出来たら、URL入力テキストボックスにそのURLをセット、
@@ -2424,5 +2494,9 @@ namespace SpeechCast
             this.openResCaptionForm();
         }
 
+        private void webBrowser_DocumentCompleted_1(object sender, WebBrowserDocumentCompletedEventArgs e)
+        {
+
+        }
     }
 }

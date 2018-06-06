@@ -253,7 +253,7 @@ namespace SpeechCast
         /// お気に入りからスレを開いたときにレス表示欄を末尾まで移動するかのフラグ
         /// </summary>
         public bool enableMoveBottomFromBookmarks = false;
-        
+
         /// <summary>
         /// 文字数制限
         /// </summary>

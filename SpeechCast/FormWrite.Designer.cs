@@ -128,6 +128,7 @@
             this.buttonPlay.Name = "buttonPlay";
             this.buttonPlay.Size = new System.Drawing.Size(46, 23);
             this.buttonPlay.TabIndex = 7;
+            this.buttonPlay.Text = "更新";
             this.buttonPlay.UseVisualStyleBackColor = true;
             this.buttonPlay.Click += new System.EventHandler(this.buttonPlay_Click);
             // 
@@ -181,8 +182,8 @@
             this.ShowInTaskbar = false;
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
             this.Text = "スレッド作成";
-            this.Shown += new System.EventHandler(this.FormWrite_Shown);
             this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.FormWrite_FormClosing);
+            this.Shown += new System.EventHandler(this.FormWrite_Shown);
             this.ResumeLayout(false);
             this.PerformLayout();
 

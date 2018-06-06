@@ -233,7 +233,6 @@ namespace SpeechCast
             userConfig.AutoReloadAlertMessage = this.textBoxAutoReloadAlertMessage.Text;
             userConfig.endThreadWarningResCount = (int)this.numericUpDownEndThreadWarningResCount.Value;
             userConfig.enableMoveBottomFromBookmarks = this.checkBoxEnableMoveBottomFromBookmarks.Checked;
-
             userConfig.OutputLogPath = this.textBoxOutputLogPath.Text;
             userConfig.OutputLogFormat = this.textBoxOutputLogFormat.Text.Replace("\r\n", "\n").Replace("\n", "\r\n");
             userConfig.OutputLog = this.checkOutputLog.Checked;
@@ -627,6 +626,14 @@ namespace SpeechCast
 
         }
 
+        private void textBoxOutputLogFormat_TextChanged(object sender, EventArgs e)
+        {
 
-     }
+        }
+
+        private void checkBoxEnabledarktheme_CheckedChanged(object sender, EventArgs e)
+        {
+
+        }
+    }
 }
