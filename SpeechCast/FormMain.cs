@@ -29,6 +29,8 @@ namespace SpeechCast
         private const uint SET_FEATURE_ON_PROCESS = 0x00000002;
         private const int FEATURE_DISABLE_NAVIGATION_SOUNDS = 21;
 
+        Speaker speaker;
+
         DateTime objDate = new DateTime();
         public FormMain()
         {
