@@ -18,7 +18,7 @@ namespace SpeechCast
         /// <summary>
         /// SAPIなエンジンへアクセスするためのインスタンス。
         /// </summary>
-        private SpeechSynthesizer synthesizer = new SpeechSynthesizer();
+        protected SpeechSynthesizer synthesizer = new SpeechSynthesizer();
 
         private Speaker() {
 
@@ -28,17 +28,15 @@ namespace SpeechCast
                 // メンバ変数へ列挙されたボイスを追加。
                 InstalledVoices.Add(voice);
             }
+
+            synthesizer.SpeakCompleted += new EventHandler<SpeakCompletedEventArgs>(SpeakingEnd);
+            synthesizer.SpeakProgress += new EventHandler<SpeakProgressEventArgs>(ASPISpeakingSentence);
         }
 
         /// <summary>
         /// SAPIな音声合成エンジンの一覧。
         /// </summary>
         public List<InstalledVoice> InstalledVoices { get; protected set; }
-
-        /// <summary>
-        /// 現在、発声中かのフラグ。
-        /// </summary>
-        public bool IsSpeaking { get; protected set; }
 
         /// <summary>
         /// このクラスのインスタンスへアクセスするためのアクセサ。
@@ -88,6 +86,7 @@ namespace SpeechCast
             try
             {
                 Process.Start(programName, "");
+                ExecuteFileName = programName;
             }
             catch
             {
@@ -97,10 +96,92 @@ namespace SpeechCast
             return true;
         }
 
+
+        private Process ExecutedProcess = null;
+        private string ExecuteFileName = "";
+
+        protected static string SpeakingSentence = "";
+
+        public virtual void SpeakSentence(string sentence)
+        {
+            sentence = MMFrame.Text.Language.Japanese.ToKatakanaFromKatakanaHalf(sentence);
+            switch (SpeakingType)
+            {
+                case SynthesizerType.CommandLine:
+                    if (ExecuteFileName == "")
+                    {
+                        return;
+                    }
+                    ExecutedProcess.StartInfo = new ProcessStartInfo(ExecuteFileName, sentence);
+                    ExecutedProcess.SynchronizingObject = null;
+                    ExecutedProcess.EnableRaisingEvents = true;
+                    ExecutedProcess.Exited += new EventHandler(SpeakingEnd);
+                    IsSpeaking = true;
+                    SpokenSentence spokenSentence = new SpokenSentence();
+                    spokenSentence.Sentence = sentence;
+                    SpokenSentenceEvent(this, spokenSentence);
+                    SpeakingSentence = sentence;
+                    ExecutedProcess.Start();
+                    break;
+
+                case SynthesizerType.SAPI:
+                    synthesizer
+                    break;
+
+                case SynthesizerType.None:
+                default:
+                    break;
+            }
+        }
+
+        protected void SpeakingEnd(object sender, EventArgs eventArgs)
+        {
+            IsSpeaking = false;
+            SpeakingSentence = "";
+            EventHandler eventHandler = SpeakingEndEvent;
+            if (eventHandler != null)
+            {
+                eventHandler(this, eventArgs);
+            }
+            
+        }
+
+        protected void ASPISpeakingSentence(object sender, SpeakProgressEventArgs eventArgs)
+        {
+            IsSpeaking = true;
+
+            int index = eventArgs.CharacterPosition + eventArgs.CharacterCount;
+            if (index > 0)
+            {
+                index = index - 1;
+            }
+
+            if (index > SpeakingSentence.Length)
+            {
+                index = SpeakingSentence.Length;
+            }
+
+            string SpokenString = SpeakingSentence.Substring(0, index);
+            SpokenSentence spokenSentence = new SpokenSentence();
+            spokenSentence.Sentence = SpokenString;
+            SpokenSentenceEvent(this, spokenSentence);
+            
+        }
+
+        public event SpokenSentenceEventHandler SpokenSentenceEvent;
+        public event EventHandler SpeakingEndEvent;
+
         /// <summary>
-        /// 発声メソッドが呼び出されてから発音した音(文章)。
+        /// 現在、発声中かのフラグ。
         /// </summary>
-        public string SpokeSentence { get; protected set; }
-        
+        public static bool IsSpeaking { get; protected set; } = false;
     }
+
+    public class SpokenSentence : EventArgs
+    {
+        public string Sentence { get; set; }
+    }
+
+    public delegate void SpokenSentenceEventHandler(object sender, SpokenSentence eventArgs);
+
 }
