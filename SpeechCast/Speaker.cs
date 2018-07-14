@@ -8,25 +8,35 @@ using System.Diagnostics;
 
 namespace SpeechCast
 {
-    class Speaker
+    public class Speaker
     {
-        /// <summary>
-        /// 自身のインスタンス。シングルトンなクラスであることに注意。
-        /// </summary>
-        private static readonly Speaker instance = new Speaker();
 
         /// <summary>
         /// SAPIなエンジンへアクセスするためのインスタンス。
         /// </summary>
-        protected SpeechSynthesizer synthesizer = new SpeechSynthesizer();
+        protected static SpeechSynthesizer synthesizer;
 
         private Speaker() {
+
+            if (synthesizer == null)
+            {
+                synthesizer = new SpeechSynthesizer();
+                synthesizer.Volume = 100;
+            }
+
+            if (InstalledVoices == null)
+            {
+                InstalledVoices = new List<InstalledVoice>();
+            }
 
             // インストール済みのSAPIなボイスを列挙
             foreach (InstalledVoice voice in synthesizer.GetInstalledVoices())
             {
                 // メンバ変数へ列挙されたボイスを追加。
-                InstalledVoices.Add(voice);
+                if (voice != null)
+                {
+                    InstalledVoices.Add(voice);
+                }
             }
 
             synthesizer.SpeakCompleted += new EventHandler<SpeakCompletedEventArgs>(SpeakingEnd);
@@ -34,14 +44,27 @@ namespace SpeechCast
         }
 
         /// <summary>
+        /// 自身のインスタンス。シングルトンなクラスであることに注意。
+        /// </summary>
+        private static Speaker instance;
+
+        /// <summary>
         /// SAPIな音声合成エンジンの一覧。
         /// </summary>
-        public List<InstalledVoice> InstalledVoices { get; protected set; }
+        public List<InstalledVoice> InstalledVoices { get; protected set; } = new List<InstalledVoice>();
 
         /// <summary>
         /// このクラスのインスタンスへアクセスするためのアクセサ。
         /// </summary>
-        public static Speaker Instance { get { return instance; } }
+        public static Speaker Instance { get {
+                if (instance == null)
+                {
+                    instance = new Speaker();
+                }
+
+                return instance;
+            }
+        }
 
         /// <summary>
         /// 現在の発声メソッドを表わすための型。
@@ -56,7 +79,7 @@ namespace SpeechCast
         /// <summary>
         /// 現在選択されている発声メソッド。
         /// </summary>
-        public SynthesizerType SpeakingType { get; protected set; } = SynthesizerType.None;
+        public static SynthesizerType SpeakingType { get; protected set; } = SynthesizerType.None;
 
         /// <summary>
         /// SAPIな発声エンジンを設定するメソッド。
@@ -64,17 +87,23 @@ namespace SpeechCast
         /// <param name="voice">readonlyなメンバーinstalledVoiceの中のうちの1つ。</param>
         public bool SetSpeakingSAPIMethod(InstalledVoice voice)
         {
-            synthesizer.SelectVoice(voice.ToString());
+            try
+            {
+                synthesizer.SelectVoice(voice.VoiceInfo.Name);
 
-            SpeakingType = SynthesizerType.SAPI;
-
+                SpeakingType = SynthesizerType.SAPI;
+            }
+            catch
+            {
+                return false;
+            }
             return true;
         }
 
         /// <summary>
         /// 現在設定されている外部発声プログラム。
         /// </summary>
-        public string SynthesizerProgram { get; protected set; } = "";
+        public static string SynthesizerProgram { get; protected set; } = "";
 
         /// <summary>
         /// 発声メソッドを外部プログラムに指定する。
@@ -85,12 +114,18 @@ namespace SpeechCast
         {
             try
             {
+                if (programName == "")
+                {
+                    ExecuteFileName = "";
+                    SpeakingType = SynthesizerType.None;
+                    return false;
+                }
                 Process.Start(programName, "");
                 ExecuteFileName = programName;
+                SpeakingType = SynthesizerType.CommandLine;
             }
             catch
             {
-                SpeakingType = SynthesizerType.None;
                 return false;
             }
             return true;
@@ -119,13 +154,13 @@ namespace SpeechCast
                     IsSpeaking = true;
                     SpokenSentence spokenSentence = new SpokenSentence();
                     spokenSentence.Sentence = sentence;
-                    SpokenSentenceEvent(this, spokenSentence);
                     SpeakingSentence = sentence;
                     ExecutedProcess.Start();
                     break;
 
                 case SynthesizerType.SAPI:
-                    synthesizer
+                    IsSpeaking = true;
+                    synthesizer.SpeakAsync(sentence);
                     break;
 
                 case SynthesizerType.None:
@@ -164,11 +199,19 @@ namespace SpeechCast
             string SpokenString = SpeakingSentence.Substring(0, index);
             SpokenSentence spokenSentence = new SpokenSentence();
             spokenSentence.Sentence = SpokenString;
-            SpokenSentenceEvent(this, spokenSentence);
             
         }
 
-        public event SpokenSentenceEventHandler SpokenSentenceEvent;
+        protected virtual void OnSpokenSentenceEvent(SpokenSentence spokenSentence)
+        {
+            EventHandler<SpokenSentence> handler = SpokenSentenceEvent;
+            if (handler != null)
+            {
+                handler(this, spokenSentence);
+            }
+        }
+
+        public event EventHandler<SpokenSentence> SpokenSentenceEvent;
         public event EventHandler SpeakingEndEvent;
 
         /// <summary>

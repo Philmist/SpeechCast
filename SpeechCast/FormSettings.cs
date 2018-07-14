@@ -355,6 +355,11 @@ namespace SpeechCast
         private void buttonOK_Click(object sender, EventArgs e)
         {
             DialogResult = DialogResult.OK;
+
+            Speaker speaker = Speaker.Instance;
+            UserConfig userConfig = FormMain.UserConfig;
+            bool result = speaker.SetSpeakingProgram(userConfig.CommandLineTargetPath);
+
             Close();
         }
 

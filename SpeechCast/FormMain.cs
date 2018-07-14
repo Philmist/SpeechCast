@@ -29,8 +29,6 @@ namespace SpeechCast
         private const uint SET_FEATURE_ON_PROCESS = 0x00000002;
         private const int FEATURE_DISABLE_NAVIGATION_SOUNDS = 21;
 
-        Speaker speaker;
-
         DateTime objDate = new DateTime();
         public FormMain()
         {
@@ -223,9 +221,21 @@ namespace SpeechCast
 
             if (idx >= 0)
             {
+
                 string voiceName = toolStripComboBoxSelectVoice.Items[idx].ToString();
+
                 synthesizer.SelectVoice(voiceName);
                 UserConfig.VoiceName = voiceName;
+
+                foreach (var i in speaker.InstalledVoices)
+                {
+                    Debug.WriteLine(i.ToString());
+                    if (i.VoiceInfo.Name == voiceName)
+                    {
+                        speaker.SetSpeakingSAPIMethod(i);
+                    }
+                }
+
             }
         }
 
@@ -993,6 +1003,39 @@ namespace SpeechCast
         }
         int fileNameIndex = 0;
 
+
+        public Speaker speaker = Speaker.Instance;
+
+        public enum ResReadingState
+        {
+            StopReading,
+            ResReading,
+            ThreadWarning,
+            ThreadStop
+        };
+
+        public enum AnnounceSpeakingState
+        {
+            Stop,
+            Speaking,
+            Completed
+        };
+
+        public class ThreadReadingComplexState {
+            public ResReadingState readingState;
+            public AnnounceSpeakingState speakingState;
+            public ThreadReadingComplexState(ResReadingState res, AnnounceSpeakingState ana)
+            {
+                readingState = res;
+                speakingState = ana;
+            }
+        }
+
+        /// <summary>
+        /// 現在のスレ読み状態。
+        /// </summary>
+        private static ThreadReadingComplexState ThreadReadingState = new ThreadReadingComplexState(ResReadingState.StopReading, AnnounceSpeakingState.Stop);
+
         private bool isSpeaking = false;
         private string speakingText = "";
         private bool isSpeakingWarningMessage = false;
@@ -1022,7 +1065,12 @@ namespace SpeechCast
 
                 isSpeakingWarningMessage = false;
                 isSpeaking = true;
+
+                ThreadReadingState.speakingState = AnnounceSpeakingState.Speaking;
+                ThreadReadingState.readingState = ResReadingState.ResReading;
+
                 StartSpeaking(text);
+                
                 //コマンドライン引渡し
                 //ターゲット指定が空でなければ実行
                 // ミミックかってに改造 テスト実装でそのままだった変数への代入がきちんと行われるように追加
@@ -1034,7 +1082,8 @@ namespace SpeechCast
                         LogText2 = LogText2.Replace("#Name#", res.Name);
                         LogText2 = LogText2.Replace("#No#", res.Number.ToString());
                         LogText2 = LogText2.Replace("#Time#", res.DateTime);
-                        System.Diagnostics.Process.Start(UserConfig.CommandLineTargetPath, LogText2);
+                        //System.Diagnostics.Process.Start(UserConfig.CommandLineTargetPath, LogText2);
+                        speaker.SpeakSentence(LogText2);
                     }
                     else if (UserConfig.IncludeAAConditionText(text))
                     {
@@ -1042,7 +1091,8 @@ namespace SpeechCast
                         LogText2 = LogText2.Replace("#Name#", res.Name);
                         LogText2 = LogText2.Replace("#No#", res.Number.ToString());
                         LogText2 = LogText2.Replace("#Time#", res.DateTime);
-                        System.Diagnostics.Process.Start(UserConfig.CommandLineTargetPath, LogText2);
+                        //System.Diagnostics.Process.Start(UserConfig.CommandLineTargetPath, LogText2);
+                        speaker.SpeakSentence(LogText2);
                     }
                     else
                     {
@@ -1050,7 +1100,8 @@ namespace SpeechCast
                         LogText = LogText.Replace("#Name#", res.Name);
                         LogText = LogText.Replace("#No#", res.Number.ToString());
                         LogText = LogText.Replace("#Time#", res.DateTime);
-                        System.Diagnostics.Process.Start(UserConfig.CommandLineTargetPath, LogText);
+                        //System.Diagnostics.Process.Start(UserConfig.CommandLineTargetPath, LogText);
+                        speaker.SpeakSentence(LogText);
                     }
                 }
                 // ミミックかってに改造 ここまで
@@ -1131,7 +1182,7 @@ namespace SpeechCast
                                 
 
                             }
-                            System.Threading.Thread.Sleep(UserConfig.LogOutputInterval);
+                            Thread.Sleep(UserConfig.LogOutputInterval);
                             
                             fileNameIndex++;
 
@@ -1139,9 +1190,11 @@ namespace SpeechCast
                     }
                 } 
                 listViewResponses.Items[CurrentResNumber - 1].Selected = true;
+
+                ThreadReadingState.speakingState = AnnounceSpeakingState.Stop;
                 //webBrowser.Document.Window.ScrollTo(0, GetResponsesScrollY(CurrentResNumber));
             }
-            else if (openNextThread == OpenNextThread)
+            else if (openNextThread == OpenNextThread && ThreadReadingState.speakingState == AnnounceSpeakingState.Stop)
             {
                 openNextThread = SpeakAnnounce;
                 speakingText = string.Format("次スレ候補、{0}を開きます。", threadTitle);
@@ -1151,9 +1204,16 @@ namespace SpeechCast
                 FormCaption.Instance.IsAAMode = false;
                 synthesizer.Rate = UserConfig.SpeakingRate;
                 isSpeaking = true;
-                synthesizer.SpeakAsync(speakingText);
+
+                ThreadReadingState.speakingState = AnnounceSpeakingState.Speaking;
+
+                //synthesizer.SpeakAsync(speakingText);
+                speaker.SpeakSentence(speakingText);
+
+                ThreadReadingState.readingState = ResReadingState.ThreadStop;
+                ThreadReadingState.speakingState = AnnounceSpeakingState.Completed;
             }
-            else if (CurrentResNumber > Response.MaxResponseCount && openNextThread == ReadThread)
+            else if (CurrentResNumber > Response.MaxResponseCount && openNextThread == ReadThread && ThreadReadingState.speakingState == AnnounceSpeakingState.Stop)
             {
                 speakingText = string.Format("レス{0}を超えました。\nこれ以上は表示できません。\n次スレを立ててください。", Response.MaxResponseCount);
 
@@ -1162,12 +1222,22 @@ namespace SpeechCast
                 FormCaption.Instance.IsAAMode = false;
                 synthesizer.Rate = UserConfig.SpeakingRate;
                 isSpeaking = true;
-                synthesizer.SpeakAsync(speakingText);
+
+                ThreadReadingState.speakingState = AnnounceSpeakingState.Speaking;
+
+                //synthesizer.SpeakAsync(speakingText);
+                speaker.SpeakSentence(speakingText);
+
+                ThreadReadingState.readingState = ResReadingState.ThreadStop;
+                ThreadReadingState.speakingState = AnnounceSpeakingState.Completed;
             }
             else
             {
                 if(isSpeaking)speakingCompletedTime = System.DateTime.Now;
                 isSpeaking = false;
+
+                ThreadReadingState.readingState = ResReadingState.StopReading;
+                ThreadReadingState.speakingState = AnnounceSpeakingState.Stop;
             }
         }
 
@@ -1267,7 +1337,8 @@ namespace SpeechCast
                 synthesizer.Volume = 0;
             }
             if (CurrentResNumber == NewResponseNumber) PlaySoundNewResponse();
-            synthesizer.SpeakAsync(MMFrame.Text.Language.Japanese.ToKatakanaFromKatakanaHalf(pronounciationText));
+            //synthesizer.SpeakAsync(MMFrame.Text.Language.Japanese.ToKatakanaFromKatakanaHalf(pronounciationText));
+            speaker.SpeakSentence(pronounciationText);
         }
 
         public void StopSpeaking()
@@ -1281,7 +1352,7 @@ namespace SpeechCast
             FormCaption.Instance.CaptionText = "";
             synthesizer.SpeakAsyncCancelAll();
 
-            this.Enabled = false; //UIをOFF
+            //this.Enabled = false; //UIをOFF
             try
             {
                 while (isSpeaking)
