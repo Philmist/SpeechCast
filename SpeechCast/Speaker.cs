@@ -39,8 +39,8 @@ namespace SpeechCast
                 }
             }
 
-            synthesizer.SpeakCompleted += new EventHandler<SpeakCompletedEventArgs>(SpeakingEnd);
-            synthesizer.SpeakProgress += new EventHandler<SpeakProgressEventArgs>(ASPISpeakingSentence);
+            synthesizer.SpeakCompleted += new EventHandler<SpeakCompletedEventArgs>(SAPISpeakingEnd);
+            synthesizer.SpeakProgress += new EventHandler<SpeakProgressEventArgs>(SAPISpeakingSentence);
         }
 
         /// <summary>
@@ -107,7 +107,7 @@ namespace SpeechCast
 
         /// <summary>
         /// 発声メソッドを外部プログラムに指定する。
-        /// 指定できなかった場合は無指定となる。
+        /// 指定できなかった場合は以前と同じままとなる
         /// </summary>
         /// <param name="programName">外部プログラムへのパス。</param>
         public bool SetSpeakingProgram(string programName)
@@ -117,7 +117,6 @@ namespace SpeechCast
                 if (programName == "")
                 {
                     ExecuteFileName = "";
-                    SpeakingType = SynthesizerType.None;
                     return false;
                 }
                 Process.Start(programName, "");
@@ -135,7 +134,7 @@ namespace SpeechCast
         private Process ExecutedProcess = null;
         private string ExecuteFileName = "";
 
-        protected static string SpeakingSentence = "";
+        public string SpeakingSentence { get; protected set; } = "";
 
         public virtual void SpeakSentence(string sentence)
         {
@@ -150,11 +149,9 @@ namespace SpeechCast
                     ExecutedProcess.StartInfo = new ProcessStartInfo(ExecuteFileName, sentence);
                     ExecutedProcess.SynchronizingObject = null;
                     ExecutedProcess.EnableRaisingEvents = true;
-                    ExecutedProcess.Exited += new EventHandler(SpeakingEnd);
+                    ExecutedProcess.Exited += new EventHandler(ExecutedProcessEnd);
                     IsSpeaking = true;
-                    SpokenSentence spokenSentence = new SpokenSentence();
-                    spokenSentence.Sentence = sentence;
-                    SpeakingSentence = sentence;
+                    OnSpokenSentence(sentence);
                     ExecutedProcess.Start();
                     break;
 
@@ -169,7 +166,17 @@ namespace SpeechCast
             }
         }
 
-        protected void SpeakingEnd(object sender, EventArgs eventArgs)
+        protected virtual void ExecutedProcessEnd(object sender, EventArgs eventArgs)
+        {
+            SpeakingEnd(eventArgs);
+        }
+
+        protected virtual void SAPISpeakingEnd(object sender, EventArgs eventArgs)
+        {
+            SpeakingEnd(eventArgs);
+        }
+
+        protected virtual void SpeakingEnd(EventArgs eventArgs)
         {
             IsSpeaking = false;
             SpeakingSentence = "";
@@ -181,7 +188,12 @@ namespace SpeechCast
             
         }
 
-        protected void ASPISpeakingSentence(object sender, SpeakProgressEventArgs eventArgs)
+        protected void OnSpeakingEnd()
+        {
+            SpeakingEnd(EventArgs.Empty);
+        }
+
+        protected void SAPISpeakingSentence(object sender, SpeakProgressEventArgs eventArgs)
         {
             IsSpeaking = true;
 
@@ -205,10 +217,18 @@ namespace SpeechCast
         protected virtual void OnSpokenSentenceEvent(SpokenSentence spokenSentence)
         {
             EventHandler<SpokenSentence> handler = SpokenSentenceEvent;
+            SpeakingSentence += spokenSentence.Sentence;
             if (handler != null)
             {
                 handler(this, spokenSentence);
             }
+        }
+
+        protected virtual void OnSpokenSentence(string Sentence)
+        {
+            SpokenSentence spoken = new SpokenSentence();
+            spoken.Sentence = Sentence;
+            OnSpokenSentenceEvent(spoken);
         }
 
         public event EventHandler<SpokenSentence> SpokenSentenceEvent;

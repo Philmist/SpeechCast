@@ -59,6 +59,8 @@ namespace SpeechCast
             synthesizer.SpeakProgress += new EventHandler<SpeakProgressEventArgs>(synthesizer_SpeakProgress);
             synthesizer.SpeakCompleted += new EventHandler<SpeakCompletedEventArgs>(synthesizer_SpeakCompleted);
 
+            
+
             // 生成されたインスタンスを変数へ代入(別フォームからの操作のため)
             Instance = this;
 
@@ -170,9 +172,38 @@ namespace SpeechCast
             }
         }
 
+        void SpeakCompleted(object sender)
+        {
+            speakingCompletedTime = DateTime.Now;
+            isSpeaking = false;
+
+            FormCaption.Instance.CaptionText = speaker.SpeakingSentence;
+
+            if (ThreadReadingState.readingState == ResReadingState.ThreadStop && ThreadReadingState.speakingState == AnnounceSpeakingState.Speaking)
+            {
+                ThreadReadingState.speakingState = AnnounceSpeakingState.Completed;
+                ThreadReadingState.readingState = ResReadingState.ResReading;
+                CurrentResNumber = 0;
+            } else if (endThreadWarning) {
+                CurrentResNumber = CurrentResNumber;
+                ThreadReadingState.speakingState = AnnounceSpeakingState.Completed;
+                ThreadReadingState.readingState = ResReadingState.ResReading;
+            }
+        }
+
         System.DateTime speakingCompletedTime;
         System.DateTime gettingWebTime;
 
+
+        void SpeakProgress(object sender, SpokenSentence spokenSentence)
+        {
+            string DisplayString = spokenSentence.Sentence;
+
+            ThreadReadingState.readingState = ResReadingState.ResReading;
+            ThreadReadingState.speakingState = AnnounceSpeakingState.Speaking;
+
+            FormCaption.Instance.CaptionText = DisplayString;
+        }
 
         void synthesizer_SpeakProgress(object sender, SpeakProgressEventArgs e)
         {
