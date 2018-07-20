@@ -59,7 +59,11 @@ namespace SpeechCast
             synthesizer.SpeakProgress += new EventHandler<SpeakProgressEventArgs>(synthesizer_SpeakProgress);
             synthesizer.SpeakCompleted += new EventHandler<SpeakCompletedEventArgs>(synthesizer_SpeakCompleted);
 
-            
+
+            // 汎用読み上げクラスを初期化
+            speaker = Speaker.Instance;
+            speaker.SpokenSentenceEvent += new EventHandler<SpokenSentence>(SpeakProgress);
+            speaker.SpeakingEndEvent += new EventHandler(SpeakCompleted);
 
             // 生成されたインスタンスを変数へ代入(別フォームからの操作のため)
             Instance = this;
@@ -172,7 +176,7 @@ namespace SpeechCast
             }
         }
 
-        void SpeakCompleted(object sender)
+        void SpeakCompleted(object sender, EventArgs eventArgs)
         {
             speakingCompletedTime = DateTime.Now;
             isSpeaking = false;
@@ -202,7 +206,7 @@ namespace SpeechCast
             ThreadReadingState.readingState = ResReadingState.ResReading;
             ThreadReadingState.speakingState = AnnounceSpeakingState.Speaking;
 
-            FormCaption.Instance.CaptionText = DisplayString;
+            FormCaption.Instance.CaptionText = speaker.SpeakingSentence;
         }
 
         void synthesizer_SpeakProgress(object sender, SpeakProgressEventArgs e)
@@ -1035,7 +1039,7 @@ namespace SpeechCast
         int fileNameIndex = 0;
 
 
-        public Speaker speaker = Speaker.Instance;
+        public Speaker speaker;
 
         public enum ResReadingState
         {

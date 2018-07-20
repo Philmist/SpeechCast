@@ -39,8 +39,8 @@ namespace SpeechCast
                 }
             }
 
-            synthesizer.SpeakCompleted += new EventHandler<SpeakCompletedEventArgs>(SAPISpeakingEnd);
-            synthesizer.SpeakProgress += new EventHandler<SpeakProgressEventArgs>(SAPISpeakingSentence);
+            synthesizer.SpeakCompleted += new EventHandler<SpeakCompletedEventArgs>(OnSAPISpeakingEnd);
+            synthesizer.SpeakProgress += new EventHandler<SpeakProgressEventArgs>(OnSAPISpeakingSentence);
         }
 
         /// <summary>
@@ -139,6 +139,7 @@ namespace SpeechCast
         public virtual void SpeakSentence(string sentence)
         {
             sentence = MMFrame.Text.Language.Japanese.ToKatakanaFromKatakanaHalf(sentence);
+            SpeakingSentence = sentence;
             switch (SpeakingType)
             {
                 case SynthesizerType.CommandLine:
@@ -149,7 +150,7 @@ namespace SpeechCast
                     ExecutedProcess.StartInfo = new ProcessStartInfo(ExecuteFileName, sentence);
                     ExecutedProcess.SynchronizingObject = null;
                     ExecutedProcess.EnableRaisingEvents = true;
-                    ExecutedProcess.Exited += new EventHandler(ExecutedProcessEnd);
+                    ExecutedProcess.Exited += new EventHandler(OnExecutedProcessEnd);
                     IsSpeaking = true;
                     OnSpokenSentence(sentence);
                     ExecutedProcess.Start();
@@ -162,21 +163,22 @@ namespace SpeechCast
 
                 case SynthesizerType.None:
                 default:
+                    SpeakingEnd();
                     break;
             }
         }
 
-        protected virtual void ExecutedProcessEnd(object sender, EventArgs eventArgs)
+        protected virtual void OnExecutedProcessEnd(object sender, EventArgs eventArgs)
         {
-            SpeakingEnd(eventArgs);
+            OnSpeakingEnd(eventArgs);
         }
 
-        protected virtual void SAPISpeakingEnd(object sender, EventArgs eventArgs)
+        protected virtual void OnSAPISpeakingEnd(object sender, EventArgs eventArgs)
         {
-            SpeakingEnd(eventArgs);
+            OnSpeakingEnd(eventArgs);
         }
 
-        protected virtual void SpeakingEnd(EventArgs eventArgs)
+        protected virtual void OnSpeakingEnd(EventArgs eventArgs)
         {
             IsSpeaking = false;
             SpeakingSentence = "";
@@ -188,12 +190,12 @@ namespace SpeechCast
             
         }
 
-        protected void OnSpeakingEnd()
+        protected virtual void SpeakingEnd()
         {
-            SpeakingEnd(EventArgs.Empty);
+             OnSpeakingEnd(EventArgs.Empty);
         }
 
-        protected void SAPISpeakingSentence(object sender, SpeakProgressEventArgs eventArgs)
+        protected virtual void OnSAPISpeakingSentence(object sender, SpeakProgressEventArgs eventArgs)
         {
             IsSpeaking = true;
 
@@ -211,13 +213,13 @@ namespace SpeechCast
             string SpokenString = SpeakingSentence.Substring(0, index);
             SpokenSentence spokenSentence = new SpokenSentence();
             spokenSentence.Sentence = SpokenString;
+            OnSpokenSentenceEvent(spokenSentence);
             
         }
 
         protected virtual void OnSpokenSentenceEvent(SpokenSentence spokenSentence)
         {
             EventHandler<SpokenSentence> handler = SpokenSentenceEvent;
-            SpeakingSentence += spokenSentence.Sentence;
             if (handler != null)
             {
                 handler(this, spokenSentence);
@@ -244,7 +246,5 @@ namespace SpeechCast
     {
         public string Sentence { get; set; }
     }
-
-    public delegate void SpokenSentenceEventHandler(object sender, SpokenSentence eventArgs);
 
 }
