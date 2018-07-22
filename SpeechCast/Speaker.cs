@@ -239,7 +239,7 @@ namespace SpeechCast
         /// <summary>
         /// 現在、発声中かのフラグ。
         /// </summary>
-        public static bool IsSpeaking { get; protected set; } = false;
+        public bool IsSpeaking { get; protected set; } = false;
     }
 
     public class SpokenSentence : EventArgs

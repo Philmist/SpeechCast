@@ -186,7 +186,7 @@ namespace SpeechCast
             if (ThreadReadingState.readingState == ResReadingState.ThreadStop && ThreadReadingState.speakingState == AnnounceSpeakingState.Speaking)
             {
                 ThreadReadingState.speakingState = AnnounceSpeakingState.Completed;
-                ThreadReadingState.readingState = ResReadingState.ResReading;
+                ThreadReadingState.readingState = ResReadingState.ThreadStop;
                 CurrentResNumber = 0;
             } else if (endThreadWarning) {
                 CurrentResNumber = CurrentResNumber;
@@ -1387,10 +1387,10 @@ namespace SpeechCast
             FormCaption.Instance.CaptionText = "";
             synthesizer.SpeakAsyncCancelAll();
 
-            //this.Enabled = false; //UIをOFF
+            this.Enabled = false; //UIをOFF
             try
             {
-                while (isSpeaking)
+                while (speaker.IsSpeaking)
                 {
                     Application.DoEvents();
                     System.Threading.Thread.Sleep(1);
