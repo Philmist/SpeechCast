@@ -183,15 +183,15 @@ namespace SpeechCast
 
             FormCaption.Instance.CaptionText = speaker.SpeakingSentence;
 
-            if (ThreadReadingState.readingState == ResReadingState.ThreadStop && ThreadReadingState.speakingState == AnnounceSpeakingState.Speaking)
+            if (NowThreadReadingState.readingState == ResReadingState.ThreadStop && NowThreadReadingState.speakingState == AnnounceSpeakingState.Speaking)
             {
-                ThreadReadingState.speakingState = AnnounceSpeakingState.Completed;
-                ThreadReadingState.readingState = ResReadingState.ThreadStop;
+                NowThreadReadingState.speakingState = AnnounceSpeakingState.Completed;
+                NowThreadReadingState.readingState = ResReadingState.ThreadStop;
                 CurrentResNumber = 0;
             } else if (endThreadWarning) {
                 CurrentResNumber = CurrentResNumber;
-                ThreadReadingState.speakingState = AnnounceSpeakingState.Completed;
-                ThreadReadingState.readingState = ResReadingState.ResReading;
+                NowThreadReadingState.speakingState = AnnounceSpeakingState.Completed;
+                NowThreadReadingState.readingState = ResReadingState.ResReading;
             }
         }
 
@@ -203,8 +203,8 @@ namespace SpeechCast
         {
             string DisplayString = spokenSentence.Sentence;
 
-            ThreadReadingState.readingState = ResReadingState.ResReading;
-            ThreadReadingState.speakingState = AnnounceSpeakingState.Speaking;
+            NowThreadReadingState.readingState = ResReadingState.ResReading;
+            NowThreadReadingState.speakingState = AnnounceSpeakingState.Speaking;
 
             FormCaption.Instance.CaptionText = speaker.SpeakingSentence;
         }
@@ -1053,8 +1053,16 @@ namespace SpeechCast
         {
             Stop,
             Speaking,
+            Announcing,
             Completed
         };
+
+        public enum SpeakingTiming
+        {
+            Past,
+            Now,
+            Next
+        }
 
         public class ThreadReadingComplexState {
             public ResReadingState readingState;
@@ -1069,7 +1077,18 @@ namespace SpeechCast
         /// <summary>
         /// 現在のスレ読み状態。
         /// </summary>
-        private static ThreadReadingComplexState ThreadReadingState = new ThreadReadingComplexState(ResReadingState.StopReading, AnnounceSpeakingState.Stop);
+        private static ThreadReadingComplexState NowThreadReadingState = new ThreadReadingComplexState(ResReadingState.StopReading, AnnounceSpeakingState.Stop);
+        /// <summary>
+        /// 過去(現在の1つ前)のスレ読み状態。
+        /// </summary>
+        private static ThreadReadingComplexState PastThreadReadingState = new ThreadReadingComplexState(ResReadingState.StopReading, AnnounceSpeakingState.Stop);
+
+        private static Dictionary<SpeakingTiming, ThreadReadingComplexState> ReadingState = new Dictionary<SpeakingTiming, ThreadReadingComplexState>
+        {
+            {SpeakingTiming.Past, new ThreadReadingComplexState(ResReadingState.StopReading, AnnounceSpeakingState.Stop) },
+            {SpeakingTiming.Now, new ThreadReadingComplexState(ResReadingState.StopReading, AnnounceSpeakingState.Stop) },
+            {SpeakingTiming.Next, new ThreadReadingComplexState(ResReadingState.StopReading, AnnounceSpeakingState.Stop) }
+        };
 
         private bool isSpeaking = false;
         private string speakingText = "";
@@ -1101,8 +1120,8 @@ namespace SpeechCast
                 isSpeakingWarningMessage = false;
                 isSpeaking = true;
 
-                ThreadReadingState.speakingState = AnnounceSpeakingState.Speaking;
-                ThreadReadingState.readingState = ResReadingState.ResReading;
+                NowThreadReadingState.speakingState = AnnounceSpeakingState.Speaking;
+                NowThreadReadingState.readingState = ResReadingState.ResReading;
 
                 StartSpeaking(text);
                 
@@ -1226,10 +1245,11 @@ namespace SpeechCast
                 } 
                 listViewResponses.Items[CurrentResNumber - 1].Selected = true;
 
-                ThreadReadingState.speakingState = AnnounceSpeakingState.Stop;
+                NowThreadReadingState.speakingState = AnnounceSpeakingState.Completed;
+                PastThreadReadingState.speakingState = AnnounceSpeakingState.Speaking;
                 //webBrowser.Document.Window.ScrollTo(0, GetResponsesScrollY(CurrentResNumber));
             }
-            else if (openNextThread == OpenNextThread && ThreadReadingState.speakingState == AnnounceSpeakingState.Stop)
+            else if (openNextThread == OpenNextThread && NowThreadReadingState.speakingState == AnnounceSpeakingState.Completed && NowThreadReadingState.readingState == ResReadingState.ThreadStop)
             {
                 openNextThread = SpeakAnnounce;
                 speakingText = string.Format("次スレ候補、{0}を開きます。", threadTitle);
@@ -1240,15 +1260,18 @@ namespace SpeechCast
                 synthesizer.Rate = UserConfig.SpeakingRate;
                 isSpeaking = true;
 
-                ThreadReadingState.speakingState = AnnounceSpeakingState.Speaking;
+                NowThreadReadingState.speakingState = AnnounceSpeakingState.Announcing;
+                NowThreadReadingState.readingState = ResReadingState.ThreadStop;
 
                 //synthesizer.SpeakAsync(speakingText);
                 speaker.SpeakSentence(speakingText);
 
-                ThreadReadingState.readingState = ResReadingState.ThreadStop;
-                ThreadReadingState.speakingState = AnnounceSpeakingState.Completed;
+                PastThreadReadingState.readingState = ResReadingState.ThreadStop;
+                PastThreadReadingState.speakingState = AnnounceSpeakingState.Announcing;
+
+                NowThreadReadingState.speakingState = AnnounceSpeakingState.Completed;
             }
-            else if (CurrentResNumber > Response.MaxResponseCount && openNextThread == ReadThread && ThreadReadingState.speakingState == AnnounceSpeakingState.Stop)
+            else if (CurrentResNumber > Response.MaxResponseCount && openNextThread == ReadThread && NowThreadReadingState.speakingState == AnnounceSpeakingState.Completed && PastThreadReadingState.readingState != ResReadingState.ThreadStop)
             {
                 speakingText = string.Format("レス{0}を超えました。\nこれ以上は表示できません。\n次スレを立ててください。", Response.MaxResponseCount);
 
@@ -1258,21 +1281,24 @@ namespace SpeechCast
                 synthesizer.Rate = UserConfig.SpeakingRate;
                 isSpeaking = true;
 
-                ThreadReadingState.speakingState = AnnounceSpeakingState.Speaking;
+                NowThreadReadingState.speakingState = AnnounceSpeakingState.Speaking;
 
                 //synthesizer.SpeakAsync(speakingText);
                 speaker.SpeakSentence(speakingText);
 
-                ThreadReadingState.readingState = ResReadingState.ThreadStop;
-                ThreadReadingState.speakingState = AnnounceSpeakingState.Completed;
+                NowThreadReadingState.readingState = ResReadingState.ThreadStop;
+                NowThreadReadingState.speakingState = AnnounceSpeakingState.Completed;
+
+                PastThreadReadingState.speakingState = AnnounceSpeakingState.Announcing;
+                PastThreadReadingState.readingState = ResReadingState.ThreadStop;
             }
             else
             {
                 if(isSpeaking)speakingCompletedTime = System.DateTime.Now;
                 isSpeaking = false;
 
-                ThreadReadingState.readingState = ResReadingState.StopReading;
-                ThreadReadingState.speakingState = AnnounceSpeakingState.Stop;
+                NowThreadReadingState.readingState = ResReadingState.StopReading;
+                NowThreadReadingState.speakingState = AnnounceSpeakingState.Stop;
             }
         }
 
