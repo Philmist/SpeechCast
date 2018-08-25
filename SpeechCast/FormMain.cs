@@ -63,7 +63,7 @@ namespace SpeechCast
             // 汎用読み上げクラスを初期化
             speaker = Speaker.Instance;
             speaker.SpokenSentenceEvent += new EventHandler<SpokenSentence>(SpeakProgress);
-            speaker.SpeakingEndEvent += new EventHandler(SpeakCompleted);
+            speaker.SpeakingEndEvent += new EventHandler<SpeakingEnd>(SpeakCompleted);
 
             // 生成されたインスタンスを変数へ代入(別フォームからの操作のため)
             Instance = this;
@@ -93,22 +93,6 @@ namespace SpeechCast
                 if (resNo > 0 && resNo <= responses.Count)
                 {
                     webBrowser.Document.Window.ScrollTo(0, GetResponsesScrollY(resNo));
-                }
-            }
-            // ミミックかってに改造 内蔵ビューアを使用しないように条件偽装（ごめんなさい）
-            else if (diffurl.EndsWith("tsukawanai") )
-            {
-                e.Cancel = true;
-                oepnFormViewNewtabImg(url);
-            }
-            else if (url.IndexOf("tsukawanai.com/watch?v=")>0)
-            {
-            // ミミックかってに改造 ここまで
-                e.Cancel = true;
-                Match m = youtubeId.Match(url);
-                if(m.Success){
-                    var id = m.Groups[1].Value;
-                    oepnFormViewNewtabYoutube(id);
                 }
             }
             else if (diffurl.StartsWith("http:"))

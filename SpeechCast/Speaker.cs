@@ -234,7 +234,7 @@ namespace SpeechCast
         }
 
         public event EventHandler<SpokenSentence> SpokenSentenceEvent;
-        public event EventHandler SpeakingEndEvent;
+        public event EventHandler<SpeakingEnd> SpeakingEndEvent;
 
         /// <summary>
         /// 現在、発声中かのフラグ。
@@ -242,9 +242,17 @@ namespace SpeechCast
         public bool IsSpeaking { get; protected set; } = false;
     }
 
+    /// <summary>
+    /// 今まで何が話されたかを表わすイベント
+    /// </summary>
     public class SpokenSentence : EventArgs
     {
         public string Sentence { get; set; }
+    }
+
+    public class SpeakingEnd : EventArgs
+    {
+        public bool Canceled { get; set; }
     }
 
 }
